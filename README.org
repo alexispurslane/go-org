@@ -1,7 +1,6 @@
 * go-org
-An Org mode parser for Go.
 
-[[https://raw.githubusercontent.com/alexispurslane/go-org/master/etc/example.png]]
+An Org mode parser for Go. Modernized version of what it's forked from.
 
 Please note
 - the goal for the html export is to produce sensible html output, not to exactly reproduce the output of =org-html-export=.
