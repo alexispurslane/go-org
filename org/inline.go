@@ -94,6 +94,40 @@ var macroRegexp = regexp.MustCompile(`{{{(.*)\((.*)\)}}}`)
 var timestampFormat = "2006-01-02 Mon 15:04"
 var datestampFormat = "2006-01-02 Mon"
 
+// calculatePosition computes a Position from a base offset and character offset
+func calculatePosition(input string, startLine, startColumn int, charOffset int) Position {
+	line := startLine
+	col := startColumn
+
+	for i := 0; i < charOffset && i < len(input); i++ {
+		if input[i] == '\n' {
+			line++
+			col = 1
+		} else {
+			col++
+		}
+	}
+
+	return Position{
+		StartLine:   line,
+		StartColumn: col,
+		EndLine:     line,
+		EndColumn:   col,
+	}
+}
+
+// positionFromChars returns a Position spanning from startOffset to endOffset
+func positionFromChars(input string, startLine, startColumn int, startOffset, endOffset int) Position {
+	start := calculatePosition(input, startLine, startColumn, startOffset)
+	end := calculatePosition(input, startLine, startColumn, endOffset)
+	return Position{
+		StartLine:   start.StartLine,
+		StartColumn: start.StartColumn,
+		EndLine:     end.StartLine,
+		EndColumn:   end.StartColumn,
+	}
+}
+
 var latexFragmentPairs = map[string]string{
 	`\(`: `\)`,
 	`\[`: `\]`,
@@ -101,40 +135,47 @@ var latexFragmentPairs = map[string]string{
 	`$`:  `$`,
 }
 
+// parseInline parses inline content without position tracking (legacy)
 func (d *Document) parseInline(input string) (nodes []Node) {
+	return d.parseInlineWithPos(input, 0, 0)
+}
+
+// parseInlineWithPos parses inline content with position tracking
+func (d *Document) parseInlineWithPos(input string, startLine, startColumn int) (nodes []Node) {
 	previous, current := 0, 0
 	for current < len(input) {
 		rewind, consumed, node := 0, 0, (Node)(nil)
 		switch input[current] {
 		case '^':
-			consumed, node = d.parseSubOrSuperScript(input, current)
+			consumed, node = d.parseSubOrSuperScriptWithPos(input, current, startLine, startColumn)
 		case '_':
-			rewind, consumed, node = d.parseSubScriptOrEmphasisOrInlineBlock(input, current)
+			rewind, consumed, node = d.parseSubScriptOrEmphasisOrInlineBlockWithPos(input, current, startLine, startColumn)
 		case '@':
-			consumed, node = d.parseInlineExportBlock(input, current)
+			consumed, node = d.parseInlineExportBlockWithPos(input, current, startLine, startColumn)
 		case '*', '/', '+':
-			consumed, node = d.parseEmphasis(input, current, false)
+			consumed, node = d.parseEmphasisWithPos(input, current, false, startLine, startColumn)
 		case '=', '~':
-			consumed, node = d.parseEmphasis(input, current, true)
+			consumed, node = d.parseEmphasisWithPos(input, current, true, startLine, startColumn)
 		case '[':
-			consumed, node = d.parseOpeningBracket(input, current)
+			consumed, node = d.parseOpeningBracketWithPos(input, current, startLine, startColumn)
 		case '{':
-			consumed, node = d.parseMacro(input, current)
+			consumed, node = d.parseMacroWithPos(input, current, startLine, startColumn)
 		case '<':
-			consumed, node = d.parseTimestamp(input, current)
+			consumed, node = d.parseTimestampWithPos(input, current, startLine, startColumn)
 		case '\\':
-			consumed, node = d.parseExplicitLineBreakOrLatexFragment(input, current)
+			consumed, node = d.parseExplicitLineBreakOrLatexFragmentWithPos(input, current, startLine, startColumn)
 		case '$':
-			consumed, node = d.parseLatexFragment(input, current, 1)
+			consumed, node = d.parseLatexFragmentWithPos(input, current, 1, startLine, startColumn)
 		case '\n':
-			consumed, node = d.parseLineBreak(input, current)
+			consumed, node = d.parseLineBreakWithPos(input, current, startLine, startColumn)
 		case ':':
 			rewind, consumed, node = d.parseAutoLink(input, current)
 		}
 		current -= rewind
 		if consumed != 0 {
 			if current > previous {
-				nodes = append(nodes, Text{Content: input[previous:current], IsRaw: false})
+				textPos := positionFromChars(input, startLine, startColumn, previous, current)
+				nodes = append(nodes, Text{Content: input[previous:current], IsRaw: false, Pos: textPos})
 			}
 			if node != nil {
 				nodes = append(nodes, node)
@@ -147,18 +188,24 @@ func (d *Document) parseInline(input string) (nodes []Node) {
 	}
 
 	if previous < len(input) {
-		nodes = append(nodes, Text{Content: input[previous:], IsRaw: false})
+		textPos := positionFromChars(input, startLine, startColumn, previous, len(input))
+		nodes = append(nodes, Text{Content: input[previous:], IsRaw: false, Pos: textPos})
 	}
 	return nodes
 }
 
 func (d *Document) parseRawInline(input string) (nodes []Node) {
+	return d.parseRawInlineWithPos(input, 0, 0)
+}
+
+func (d *Document) parseRawInlineWithPos(input string, startLine, startColumn int) (nodes []Node) {
 	previous, current := 0, 0
 	for current < len(input) {
 		if input[current] == '\n' {
-			consumed, node := d.parseLineBreak(input, current)
+			consumed, node := d.parseLineBreakWithPos(input, current, startLine, startColumn)
 			if current > previous {
-				nodes = append(nodes, Text{Content: input[previous:current], IsRaw: true})
+				textPos := positionFromChars(input, startLine, startColumn, previous, current)
+				nodes = append(nodes, Text{Content: input[previous:current], IsRaw: true, Pos: textPos})
 			}
 			nodes = append(nodes, node)
 			current += consumed
@@ -168,54 +215,82 @@ func (d *Document) parseRawInline(input string) (nodes []Node) {
 		}
 	}
 	if previous < len(input) {
-		nodes = append(nodes, Text{Content: input[previous:], IsRaw: true})
+		textPos := positionFromChars(input, startLine, startColumn, previous, len(input))
+		nodes = append(nodes, Text{Content: input[previous:], IsRaw: true, Pos: textPos})
 	}
 	return nodes
 }
 
 func (d *Document) parseLineBreak(input string, start int) (int, Node) {
+	return d.parseLineBreakWithPos(input, start, 0, 0)
+}
+
+func (d *Document) parseLineBreakWithPos(input string, start int, startLine, startColumn int) (int, Node) {
 	i := start
 	for ; i < len(input) && input[i] == '\n'; i++ {
 	}
 	_, beforeLen := utf8.DecodeLastRuneInString(input[:start])
 	_, afterLen := utf8.DecodeRuneInString(input[i:])
-	return i - start, LineBreak{Count: i - start, BetweenMultibyteCharacters: beforeLen > 1 && afterLen > 1}
+	consumed := i - start
+	pos := positionFromChars(input, startLine, startColumn, start, start+consumed)
+	return consumed, LineBreak{Count: consumed, BetweenMultibyteCharacters: beforeLen > 1 && afterLen > 1, Pos: pos}
 }
 
 func (d *Document) parseInlineBlock(input string, start int) (int, int, Node) {
+	return d.parseInlineBlockWithPos(input, start, 0, 0)
+}
+
+func (d *Document) parseInlineBlockWithPos(input string, start int, startLine, startColumn int) (int, int, Node) {
 	if !(strings.HasSuffix(input[:start], "src") && (start-4 < 0 || unicode.IsSpace(rune(input[start-4])))) {
 		return 0, 0, nil
 	}
 	if m := inlineBlockRegexp.FindStringSubmatch(input[start-3:]); m != nil {
-		return 3, len(m[0]), InlineBlock{Name: "src", Parameters: strings.Fields(m[1] + " " + m[3]), Children: d.parseRawInline(m[4])}
+		consumed := len(m[0])
+		pos := positionFromChars(input, startLine, startColumn, start-3, start+consumed)
+
+		return 3, consumed, InlineBlock{Name: "src", Parameters: strings.Fields(m[1] + " " + m[3]), Children: d.parseRawInline(m[4]), Pos: pos}
 	}
 	return 0, 0, nil
 }
 
 func (d *Document) parseInlineExportBlock(input string, start int) (int, Node) {
+	return d.parseInlineExportBlockWithPos(input, start, 0, 0)
+}
+
+func (d *Document) parseInlineExportBlockWithPos(input string, start int, startLine, startColumn int) (int, Node) {
 	if m := inlineExportBlockRegexp.FindStringSubmatch(input[start:]); m != nil {
-		return len(m[0]), InlineBlock{Name: "export", Parameters: m[1:2], Children: d.parseRawInline(m[2])}
+		consumed := len(m[0])
+		pos := positionFromChars(input, startLine, startColumn, start, start+consumed)
+		return consumed, InlineBlock{Name: "export", Parameters: m[1:2], Children: d.parseRawInline(m[2]), Pos: pos}
 	}
 	return 0, nil
 }
 
 func (d *Document) parseExplicitLineBreakOrLatexFragment(input string, start int) (int, Node) {
+	return d.parseExplicitLineBreakOrLatexFragmentWithPos(input, start, 0, 0)
+}
+
+func (d *Document) parseExplicitLineBreakOrLatexFragmentWithPos(input string, start int, startLine, startColumn int) (int, Node) {
 	switch {
 	case start+2 >= len(input):
 	case input[start+1] == '\\' && start != 0 && input[start-1] != '\n':
 		for i := start + 2; i <= len(input)-1 && unicode.IsSpace(rune(input[i])); i++ {
 			if input[i] == '\n' {
-				return i + 1 - start, ExplicitLineBreak{}
+				consumed := i + 1 - start
+				pos := positionFromChars(input, startLine, startColumn, start, start+consumed)
+				return consumed, ExplicitLineBreak{Pos: pos}
 			}
 		}
 	case input[start+1] == '(' || input[start+1] == '[':
-		return d.parseLatexFragment(input, start, 2)
+		return d.parseLatexFragmentWithPos(input, start, 2, startLine, startColumn)
 	case strings.Index(input[start:], `\begin{`) == 0:
 		if m := latexFragmentRegexp.FindStringSubmatch(input[start:]); m != nil {
 			if open, content, close := m[1], m[2], m[3]; open == close {
 				openingPair, closingPair := `\begin{`+open+`}`, `\end{`+close+`}`
 				i := strings.Index(input[start:], closingPair)
-				return i + len(closingPair), LatexFragment{OpeningPair: openingPair, ClosingPair: closingPair, Content: d.parseRawInline(content)}
+				consumed := i + len(closingPair)
+				pos := positionFromChars(input, startLine, startColumn, start, start+consumed)
+				return consumed, LatexFragment{OpeningPair: openingPair, ClosingPair: closingPair, Content: d.parseRawInline(content), Pos: pos}
 			}
 		}
 	}
@@ -223,6 +298,10 @@ func (d *Document) parseExplicitLineBreakOrLatexFragment(input string, start int
 }
 
 func (d *Document) parseLatexFragment(input string, start int, pairLength int) (int, Node) {
+	return d.parseLatexFragmentWithPos(input, start, pairLength, 0, 0)
+}
+
+func (d *Document) parseLatexFragmentWithPos(input string, start int, pairLength int, startLine, startColumn int) (int, Node) {
 	if start+2 >= len(input) {
 		return 0, nil
 	}
@@ -233,47 +312,75 @@ func (d *Document) parseLatexFragment(input string, start int, pairLength int) (
 	closingPair := latexFragmentPairs[openingPair]
 	if i := strings.Index(input[start+pairLength:], closingPair); i != -1 {
 		content := d.parseRawInline(input[start+pairLength : start+pairLength+i])
-		return i + pairLength + pairLength, LatexFragment{OpeningPair: openingPair, ClosingPair: closingPair, Content: content}
+		consumed := i + pairLength + pairLength
+		pos := positionFromChars(input, startLine, startColumn, start, start+consumed)
+		return consumed, LatexFragment{OpeningPair: openingPair, ClosingPair: closingPair, Content: content, Pos: pos}
 	}
 	return 0, nil
 }
 
 func (d *Document) parseSubOrSuperScript(input string, start int) (int, Node) {
+	return d.parseSubOrSuperScriptWithPos(input, start, 0, 0)
+}
+
+func (d *Document) parseSubOrSuperScriptWithPos(input string, start int, startLine, startColumn int) (int, Node) {
 	if m := subScriptSuperScriptRegexp.FindStringSubmatch(input[start:]); m != nil {
-		return len(m[2]) + 3, Emphasis{Kind: m[1] + "{}", Content: []Node{Text{Content: m[2], IsRaw: false}}}
+		consumed := len(m[2]) + 3
+		pos := positionFromChars(input, startLine, startColumn, start, start+consumed)
+		contentPos := positionFromChars(input, startLine, startColumn, start+2, start+2+len(m[2]))
+		content := []Node{Text{Content: m[2], IsRaw: false, Pos: contentPos}}
+		return consumed, Emphasis{Kind: m[1] + "{}", Content: content, Pos: pos}
 	}
 	return 0, nil
 }
 
 func (d *Document) parseSubScriptOrEmphasisOrInlineBlock(input string, start int) (int, int, Node) {
-	if rewind, consumed, node := d.parseInlineBlock(input, start); consumed != 0 {
+	return d.parseSubScriptOrEmphasisOrInlineBlockWithPos(input, start, 0, 0)
+}
+
+func (d *Document) parseSubScriptOrEmphasisOrInlineBlockWithPos(input string, start int, startLine, startColumn int) (int, int, Node) {
+	if rewind, consumed, node := d.parseInlineBlockWithPos(input, start, startLine, startColumn); consumed != 0 {
 		return rewind, consumed, node
-	} else if consumed, node := d.parseSubOrSuperScript(input, start); consumed != 0 {
+	} else if consumed, node := d.parseSubOrSuperScriptWithPos(input, start, startLine, startColumn); consumed != 0 {
 		return 0, consumed, node
 	}
-	consumed, node := d.parseEmphasis(input, start, false)
+	consumed, node := d.parseEmphasisWithPos(input, start, false, startLine, startColumn)
 	return 0, consumed, node
 }
 
 func (d *Document) parseOpeningBracket(input string, start int) (int, Node) {
+	return d.parseOpeningBracketWithPos(input, start, 0, 0)
+}
+
+func (d *Document) parseOpeningBracketWithPos(input string, start int, startLine, startColumn int) (int, Node) {
 	if len(input[start:]) >= 2 && input[start] == '[' && input[start+1] == '[' {
-		return d.parseRegularLink(input, start)
+		return d.parseRegularLinkWithPos(input, start, startLine, startColumn)
 	} else if footnoteRegexp.MatchString(input[start:]) {
-		return d.parseFootnoteReference(input, start)
+		return d.parseFootnoteReferenceWithPos(input, start, startLine, startColumn)
 	} else if statisticsTokenRegexp.MatchString(input[start:]) {
-		return d.parseStatisticToken(input, start)
+		return d.parseStatisticTokenWithPos(input, start, startLine, startColumn)
 	}
 	return 0, nil
 }
 
 func (d *Document) parseMacro(input string, start int) (int, Node) {
+	return d.parseMacroWithPos(input, start, 0, 0)
+}
+
+func (d *Document) parseMacroWithPos(input string, start int, startLine, startColumn int) (int, Node) {
 	if m := macroRegexp.FindStringSubmatch(input[start:]); m != nil {
-		return len(m[0]), Macro{Name: m[1], Parameters: strings.Split(m[2], ",")}
+		consumed := len(m[0])
+		pos := positionFromChars(input, startLine, startColumn, start, start+consumed)
+		return consumed, Macro{Name: m[1], Parameters: strings.Split(m[2], ","), Pos: pos}
 	}
 	return 0, nil
 }
 
 func (d *Document) parseFootnoteReference(input string, start int) (int, Node) {
+	return d.parseFootnoteReferenceWithPos(input, start, 0, 0)
+}
+
+func (d *Document) parseFootnoteReferenceWithPos(input string, start int, startLine, startColumn int) (int, Node) {
 	if m := footnoteRegexp.FindStringSubmatch(input[start:]); m != nil {
 		name, definition := m[1], m[3]
 		if name == "" && definition == "" {
@@ -281,21 +388,34 @@ func (d *Document) parseFootnoteReference(input string, start int) (int, Node) {
 		}
 		link := FootnoteLink{Name: name, Definition: nil}
 		if definition != "" {
-			link.Definition = &FootnoteDefinition{Name: name, Children: []Node{Paragraph{Children: d.parseInline(definition), Pos: Position{}}}, Inline: true}
+			link.Definition = &FootnoteDefinition{Name: name, Children: []Node{Paragraph{Children: d.parseInlineWithPos(definition, startLine, startColumn+start+len(name)+5), Pos: Position{}}}, Inline: true}
 		}
-		return len(m[0]), link
+		consumed := len(m[0])
+		pos := positionFromChars(input, startLine, startColumn, start, start+consumed)
+		link.Pos = pos
+		return consumed, link
 	}
 	return 0, nil
 }
 
 func (d *Document) parseStatisticToken(input string, start int) (int, Node) {
+	return d.parseStatisticTokenWithPos(input, start, 0, 0)
+}
+
+func (d *Document) parseStatisticTokenWithPos(input string, start int, startLine, startColumn int) (int, Node) {
 	if m := statisticsTokenRegexp.FindStringSubmatch(input[start:]); m != nil {
-		return len(m[1]) + 2, StatisticToken{Content: m[1]}
+		consumed := len(m[1]) + 2
+		pos := positionFromChars(input, startLine, startColumn, start, start+consumed)
+		return consumed, StatisticToken{Content: m[1], Pos: pos}
 	}
 	return 0, nil
 }
 
 func (d *Document) parseAutoLink(input string, start int) (int, int, Node) {
+	return d.parseAutoLinkWithPos(input, start, 0, 0)
+}
+
+func (d *Document) parseAutoLinkWithPos(input string, start int, startLine, startColumn int) (int, int, Node) {
 	if !d.AutoLink || start == 0 || len(input[start:]) < 3 || input[start:start+3] != "://" {
 		return 0, 0, nil
 	}
@@ -318,10 +438,17 @@ func (d *Document) parseAutoLink(input string, start int) (int, int, Node) {
 	if path == "://" {
 		return 0, 0, nil
 	}
-	return len(protocol), len(path + protocol), RegularLink{Protocol: protocol, Description: nil, URL: protocol + path, AutoLink: true}
+	pos := positionFromChars(input, startLine, startColumn, start-len(protocol), start+len(path))
+	// pos for autolink covers the entire URL including protocol
+	rl := RegularLink{Protocol: protocol, Description: nil, URL: protocol + path, AutoLink: true, Pos: pos}
+	return len(protocol), len(path + protocol), rl
 }
 
 func (d *Document) parseRegularLink(input string, start int) (int, Node) {
+	return d.parseRegularLinkWithPos(input, start, 0, 0)
+}
+
+func (d *Document) parseRegularLinkWithPos(input string, start int, startLine, startColumn int) (int, Node) {
 	input = input[start:]
 	if len(input) < 3 || input[:2] != "[[" || input[2] == '[' {
 		return 0, nil
@@ -333,7 +460,7 @@ func (d *Document) parseRegularLink(input string, start int) (int, Node) {
 	rawLinkParts := strings.Split(input[2:end], "][")
 	description, link := ([]Node)(nil), rawLinkParts[0]
 	if len(rawLinkParts) == 2 {
-		link, description = rawLinkParts[0], d.parseInline(rawLinkParts[1])
+		link, description = rawLinkParts[0], d.parseInlineWithPos(rawLinkParts[1], startLine, startColumn+start+2)
 	}
 	if strings.ContainsRune(link, '\n') {
 		return 0, nil
@@ -343,10 +470,20 @@ func (d *Document) parseRegularLink(input string, start int) (int, Node) {
 	if len(linkParts) == 2 {
 		protocol = linkParts[0]
 	}
-	return consumed, d.ResolveLink(protocol, description, link)
+	pos := positionFromChars(input, startLine, startColumn, start, start+consumed)
+	linkNode := d.ResolveLink(protocol, description, link)
+	if rl, ok := linkNode.(RegularLink); ok {
+		rl.Pos = pos
+		return consumed, rl
+	}
+	return consumed, linkNode
 }
 
 func (d *Document) parseTimestamp(input string, start int) (int, Node) {
+	return d.parseTimestampWithPos(input, start, 0, 0)
+}
+
+func (d *Document) parseTimestampWithPos(input string, start int, startLine, startColumn int) (int, Node) {
 	if m := timestampRegexp.FindStringSubmatch(input[start:]); m != nil {
 		ddmmyy, hhmm, interval, isDate := m[1], m[3], strings.TrimSpace(m[4]), false
 		if hhmm == "" {
@@ -356,13 +493,19 @@ func (d *Document) parseTimestamp(input string, start int) (int, Node) {
 		if err != nil {
 			return 0, nil
 		}
-		timestamp := Timestamp{Time: t, IsDate: isDate, Interval: interval}
-		return len(m[0]), timestamp
+		consumed := len(m[0])
+		pos := positionFromChars(input, startLine, startColumn, start, start+consumed)
+		timestamp := Timestamp{Time: t, IsDate: isDate, Interval: interval, Pos: pos}
+		return consumed, timestamp
 	}
 	return 0, nil
 }
 
 func (d *Document) parseEmphasis(input string, start int, isRaw bool) (int, Node) {
+	return d.parseEmphasisWithPos(input, start, isRaw, 0, 0)
+}
+
+func (d *Document) parseEmphasisWithPos(input string, start int, isRaw bool, startLine, startColumn int) (int, Node) {
 	marker, i := input[start], start
 	if !hasValidPreAndBorderChars(input, i) {
 		return 0, nil
@@ -373,10 +516,14 @@ func (d *Document) parseEmphasis(input string, start int, isRaw bool) (int, Node
 		}
 
 		if input[i] == marker && i != start+1 && hasValidPostAndBorderChars(input, i) {
+			var content []Node
 			if isRaw {
-				return i + 1 - start, Emphasis{Kind: input[start : start+1], Content: d.parseRawInline(input[start+1 : i])}
+				content = d.parseRawInline(input[start+1 : i])
+			} else {
+				content = d.parseInlineWithPos(input[start+1:i], startLine, startColumn+start+1)
 			}
-			return i + 1 - start, Emphasis{Kind: input[start : start+1], Content: d.parseInline(input[start+1 : i])}
+			pos := positionFromChars(input, startLine, startColumn, start, i+1)
+			return i + 1 - start, Emphasis{Kind: input[start : start+1], Content: content, Pos: pos}
 		}
 	}
 	return 0, nil

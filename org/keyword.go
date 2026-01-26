@@ -141,7 +141,7 @@ func (d *Document) parseAffiliated(i int, stop stopFn) (int, Node) {
 	for ; !stop(d, i) && d.tokens[i].kind == "keyword"; i++ {
 		switch k := parseKeyword(d.tokens[i]); k.Key {
 		case "CAPTION":
-			meta.Caption = append(meta.Caption, d.parseInline(k.Value))
+			meta.Caption = append(meta.Caption, d.parseInlineWithPos(k.Value, d.tokens[i].line, d.tokens[i].startCol+len(k.Key)+1))
 		case "ATTR_HTML":
 			attributes, rest := []string{}, k.Value
 			for {

@@ -42,7 +42,7 @@ func (d *Document) parseParagraph(i int, parentStop stopFn) (int, Node) {
 		lines = append(lines, strings.Repeat(" ", int(lvl))+d.tokens[i].content)
 	}
 	consumed := i - start
-	paragraph := Paragraph{Children: d.parseInline(strings.Join(lines, "\n"))}
+	paragraph := Paragraph{Children: d.parseInlineWithPos(strings.Join(lines, "\n"), d.tokens[start].line, d.tokens[start].startCol)}
 	endToken := d.tokens[i-1]
 	paragraph.Pos = Position{
 		StartLine:   d.tokens[start].line,

@@ -70,7 +70,7 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 		headline.Tags = strings.FieldsFunc(m[2], func(r rune) bool { return r == ':' })
 	}
 	headline.Index = d.addHeadline(&headline)
-	headline.Title = d.parseInline(text)
+	headline.Title = d.parseInlineWithPos(text, d.tokens[i].line, d.tokens[i].startCol+len(headline.Status)+len(headline.Priority)+headline.Lvl+2)
 
 	stop := func(d *Document, i int) bool {
 		return parentStop(d, i) || d.tokens[i].kind == "headline" && len(d.tokens[i].matches[1]) <= headline.Lvl
