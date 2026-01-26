@@ -2,7 +2,7 @@ package org
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -53,7 +53,7 @@ func testWriter(t *testing.T, newWriter func() Writer, ext string) {
 
 func orgTestFiles() []string {
 	dir := "./testdata"
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		panic(fmt.Sprintf("Could not read directory: %s", err))
 	}
@@ -69,7 +69,7 @@ func orgTestFiles() []string {
 }
 
 func fileString(t *testing.T, path string) string {
-	bs, err := ioutil.ReadFile(path)
+	bs, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("Could not read file %s: %s", path, err)
 	}

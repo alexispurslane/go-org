@@ -17,7 +17,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -106,7 +105,7 @@ func New() *Configuration {
 			"OPTIONS":      "toc:t <:t e:t f:t pri:t todo:t tags:t title:t ealb:nil",
 		},
 		Log:      log.New(os.Stderr, "go-org: ", 0),
-		ReadFile: ioutil.ReadFile,
+		ReadFile: os.ReadFile,
 		ResolveLink: func(protocol string, description []Node, link string) Node {
 			return RegularLink{Protocol: protocol, Description: description, URL: link, AutoLink: false}
 		},
@@ -167,7 +166,7 @@ func (c *Configuration) Parse(input io.Reader, path string) (d *Document) {
 
 // Silent disables all logging of warnings during parsing.
 func (c *Configuration) Silent() *Configuration {
-	c.Log = log.New(ioutil.Discard, "", 0)
+	c.Log = log.New(io.Discard, "", 0)
 	return c
 }
 
