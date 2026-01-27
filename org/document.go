@@ -52,8 +52,8 @@ type Document struct {
 	NamedNodes     map[string]Node
 	Outline        Outline           // Outline is a Table Of Contents for the document and contains all sections (headline + content).
 	BufferSettings map[string]string // Settings contains all settings that were parsed from keywords.
-	Error          error
-	Pos            Position // Position tracks the location of this document in the source
+	Errors         []*ParseError     // Structured parsing errors with position information
+	Pos            Position          // Position tracks the location of this document in the source
 }
 
 // Node represents a parsed node of the document.
@@ -126,8 +126,8 @@ func (d *Document) Write(w Writer) (out string, err error) {
 			err = fmt.Errorf("could not write output: %s", recovered)
 		}
 	}()
-	if d.Error != nil {
-		return "", d.Error
+	if d.HasErrors() {
+		return "", d.Errors[0]
 	} else if d.Nodes == nil {
 		return "", fmt.Errorf("could not write output: parse was not called")
 	}
@@ -152,11 +152,12 @@ func (c *Configuration) Parse(input io.Reader, path string) (d *Document) {
 	}
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			d.Error = fmt.Errorf("could not parse input: %v", recovered)
+			d.AddError(ErrorTypeInvalidStructure, "parse panic", d.Pos, token{}, fmt.Errorf("recovered from panic: %v", recovered))
 		}
 	}()
 	if d.tokens != nil {
-		d.Error = fmt.Errorf("parse was called multiple times")
+		d.AddError(ErrorTypeValidation, "parse called multiple times", d.Pos, token{}, nil)
+		return nil
 	}
 	d.tokenize(input)
 	_, nodes := d.parseMany(0, func(d *Document, i int) bool { return i >= len(d.tokens) })
@@ -176,7 +177,13 @@ func (d *Document) tokenize(input io.Reader) {
 	lineNum := 1
 	for scanner.Scan() {
 		line := scanner.Text()
-		tok := tokenize(line)
+		tok, ok := tokenize(line)
+		if !ok {
+			pos := Position{StartLine: lineNum, StartColumn: 1, EndLine: lineNum, EndColumn: len(line) + 1}
+			d.AddError(ErrorTypeTokenization, "could not lex line", pos, token{line: lineNum}, fmt.Errorf("no lexer matched: %q", line))
+			lineNum++
+			continue
+		}
 		tok.line = lineNum
 		tok.startCol = 1
 		tok.endCol = len(line) + 1
@@ -184,7 +191,7 @@ func (d *Document) tokenize(input io.Reader) {
 		lineNum++
 	}
 	if err := scanner.Err(); err != nil {
-		d.Error = fmt.Errorf("could not tokenize input: %s", err)
+		d.AddError(ErrorTypeIO, "tokenization failed", Position{StartLine: lineNum, StartColumn: 1, EndLine: lineNum, EndColumn: 1}, token{line: lineNum}, err)
 	}
 }
 
@@ -264,7 +271,7 @@ func (d *Document) parseOne(i int, stop stopFn) (consumed int, node Node) {
 	if consumed != 0 {
 		return consumed, node
 	}
-	d.Log.Printf("Could not parse token %#v in file %s: Falling back to treating it as plain text.", d.tokens[i], d.Path)
+	d.AddError(ErrorTypeUnexpectedToken, "could not parse token", getPositionFromToken(d.tokens[i]), d.tokens[i], fmt.Errorf("no parser matched token kind %q", d.tokens[i].kind))
 	m := plainTextRegexp.FindStringSubmatch(d.tokens[i].matches[0])
 	d.tokens[i] = token{kind: "text", lvl: len(m[1]), content: m[2], matches: m}
 	return d.parseOne(i, stop)
@@ -290,11 +297,11 @@ func (d *Document) addHeadline(headline *Headline) int {
 	return d.Outline.count
 }
 
-func tokenize(line string) token {
+func tokenize(line string) (token, bool) {
 	for _, lexFn := range lexFns {
 		if token, ok := lexFn(line); ok {
-			return token
+			return token, true
 		}
 	}
-	panic(fmt.Sprintf("could not lex line: %s", line))
+	return nilToken, false
 }

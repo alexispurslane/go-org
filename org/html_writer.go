@@ -116,7 +116,7 @@ func (w *HTMLWriter) Before(d *Document) {
 	w.log = d.Log
 	if title := d.Get("TITLE"); title != "" && w.document.GetOption("title") != "nil" {
 		titleDocument := d.Parse(strings.NewReader(title), d.Path)
-		if titleDocument.Error == nil {
+		if !titleDocument.HasErrors() {
 			simpleTitle := false
 			if len(titleDocument.Nodes) == 1 {
 				switch p := titleDocument.Nodes[0].(type) {
@@ -442,8 +442,8 @@ func (w *HTMLWriter) WriteMacro(m Macro) {
 			macro = strings.Replace(macro, fmt.Sprintf("$%d", i+1), param, -1)
 		}
 		macroDocument := w.document.Parse(strings.NewReader(macro), w.document.Path)
-		if macroDocument.Error != nil {
-			w.log.Printf("bad macro: %s -> %s: %v", m.Name, macro, macroDocument.Error)
+		if macroDocument.HasErrors() {
+			w.log.Printf("bad macro: %s -> %s: %v", m.Name, macro, macroDocument.Errors[0])
 		}
 		WriteNodes(w, macroDocument.Nodes...)
 	}

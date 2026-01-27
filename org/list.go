@@ -107,7 +107,12 @@ func (d *Document) parseListItem(l List, i int, parentStop stopFn) (int, Node) {
 		}
 	}
 
-	d.tokens[i] = tokenize(strings.Repeat(" ", minIndent) + content)
+	var ok bool
+	d.tokens[i], ok = tokenize(strings.Repeat(" ", minIndent) + content)
+	if !ok {
+		line := d.tokens[i].line
+		d.AddError(ErrorTypeTokenization, "could not lex line", getPositionFromToken(d.tokens[i]), d.tokens[i], fmt.Errorf("no lexer matched: %q", line))
+	}
 	stop := func(d *Document, i int) bool {
 		if parentStop(d, i) {
 			return true

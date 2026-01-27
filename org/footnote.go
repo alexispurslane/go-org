@@ -1,6 +1,7 @@
 package org
 
 import (
+	"fmt"
 	"regexp"
 )
 
@@ -23,7 +24,12 @@ func lexFootnoteDefinition(line string) (token, bool) {
 func (d *Document) parseFootnoteDefinition(i int, parentStop stopFn) (int, Node) {
 	start, name := i, d.tokens[i].content
 	startToken := d.tokens[start]
-	d.tokens[i] = tokenize(d.tokens[i].matches[2])
+	var ok bool
+	d.tokens[i], ok = tokenize(d.tokens[i].matches[2])
+	if !ok {
+		line := d.tokens[i].line
+		d.AddError(ErrorTypeTokenization, "could not lex line", getPositionFromToken(d.tokens[i]), d.tokens[i], fmt.Errorf("no lexer matched: %q", line))
+	}
 	stop := func(d *Document, i int) bool {
 		return parentStop(d, i) ||
 			(isSecondBlankLine(d, i) && i > start+1) ||

@@ -94,21 +94,28 @@ func (d *Document) parseBlock(i int, parentStop stopFn) (int, Node) {
 		block.Children = nodes
 		i += consumed
 	}
+
 	if i >= len(d.tokens) || d.tokens[i].kind != "endBlock" || d.tokens[i].content != name {
+		d.AddError(ErrorTypeInvalidStructure, "unterminated block", getPositionFromToken(t), t, nil)
+		d.tokens[start].kind = "text"
 		return 0, nil
 	}
+	i++ // consume endBlock
+
 	if name == "SRC" {
-		consumed, result := d.parseSrcBlockResult(i+1, parentStop)
-		block.Result = result
-		i += consumed
+		consumed, result := d.parseSrcBlockResult(i, parentStop)
+		if result != nil {
+			block.Result = result
+			i += consumed
+		}
 	}
 	block.Pos = Position{
 		StartLine:   d.tokens[start].line,
 		StartColumn: d.tokens[start].startCol,
-		EndLine:     d.tokens[i].line,
-		EndColumn:   d.tokens[i].endCol,
+		EndLine:     d.tokens[i-1].line,
+		EndColumn:   d.tokens[i-1].endCol,
 	}
-	return i + 1 - start, block
+	return i - start, block
 }
 
 func (d *Document) parseLatexBlock(i int, parentStop stopFn) (int, Node) {
@@ -120,18 +127,21 @@ func (d *Document) parseLatexBlock(i int, parentStop stopFn) (int, Node) {
 	for ; !stop(d, i); i++ {
 		rawText += trim(d.tokens[i].matches[0]) + "\n"
 	}
-	if i >= len(d.tokens) || d.tokens[i].kind != "endLatexBlock" || d.tokens[i].content != name {
+	if i < len(d.tokens) && d.tokens[i].kind == "endLatexBlock" && d.tokens[i].content == name {
+		i++
+	} else {
+		d.AddError(ErrorTypeInvalidStructure, "unterminated latex block", getPositionFromToken(t), t, nil)
+		d.tokens[start].kind = "text"
 		return 0, nil
 	}
-	rawText += trim(d.tokens[i].matches[0])
 	latexBlock := LatexBlock{Content: d.parseRawInline(rawText)}
 	latexBlock.Pos = Position{
 		StartLine:   d.tokens[start].line,
 		StartColumn: d.tokens[start].startCol,
-		EndLine:     d.tokens[i].line,
-		EndColumn:   d.tokens[i].endCol,
+		EndLine:     d.tokens[i-1].line,
+		EndColumn:   d.tokens[i-1].endCol,
 	}
-	return i + 1 - start, latexBlock
+	return i - start, latexBlock
 }
 
 func (d *Document) parseSrcBlockResult(i int, parentStop stopFn) (int, Node) {
@@ -161,19 +171,23 @@ func (d *Document) parseExample(i int, parentStop stopFn) (int, Node) {
 }
 
 func (d *Document) parseResult(i int, parentStop stopFn) (int, Node) {
-	if i+1 >= len(d.tokens) {
-		return 0, nil
-	}
 	start := i
-	consumed, node := d.parseOne(i+1, parentStop)
-	result := Result{Node: node}
+	result := Result{}
+	if i+1 >= len(d.tokens) {
+		d.AddError(ErrorTypeInvalidStructure, "expected node after #+RESULTS:", getPositionFromToken(d.tokens[i]), d.tokens[i], nil)
+		result.Node = nil
+	} else {
+		consumed, node := d.parseOne(i+1, parentStop)
+		result.Node = node
+		i += consumed
+	}
 	result.Pos = Position{
 		StartLine:   d.tokens[start].line,
 		StartColumn: d.tokens[start].startCol,
 		EndLine:     d.tokens[start].line,
 		EndColumn:   d.tokens[start].endCol,
 	}
-	return consumed + 1, result
+	return i + 1 - start, result
 }
 
 func trimIndentUpTo(max int) func(string) string {
