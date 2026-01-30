@@ -102,7 +102,7 @@ func calculatePosition(input string, startLine, startColumn int, charOffset int)
 	for i := 0; i < charOffset && i < len(input); i++ {
 		if input[i] == '\n' {
 			line++
-			col = 1
+			col = 0
 		} else {
 			col++
 		}
@@ -449,15 +449,16 @@ func (d *Document) parseRegularLink(input string, start int) (int, Node) {
 }
 
 func (d *Document) parseRegularLinkWithPos(input string, start int, startLine, startColumn int) (int, Node) {
-	input = input[start:]
-	if len(input) < 3 || input[:2] != "[[" || input[2] == '[' {
+	if len(input)-start < 3 || input[start:start+2] != "[[" || input[start+2] == '[' {
 		return 0, nil
 	}
-	end := strings.Index(input, "]]")
+	end := strings.Index(input[start:], "]]")
 	if end == -1 {
 		return 0, nil
 	}
-	rawLinkParts := strings.Split(input[2:end], "][")
+	// end is relative to start, so absolute end is start+end
+	absEnd := start + end
+	rawLinkParts := strings.Split(input[start+2:absEnd], "][")
 	description, link := ([]Node)(nil), rawLinkParts[0]
 	if len(rawLinkParts) == 2 {
 		link, description = rawLinkParts[0], d.parseInlineWithPos(rawLinkParts[1], startLine, startColumn+start+2)

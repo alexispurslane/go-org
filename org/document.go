@@ -253,6 +253,9 @@ func (d *Document) parseOne(i int, stop stopFn) (consumed int, node Node) {
 	case "beginDrawer":
 		consumed, node = d.parseDrawer(i, stop)
 	case "text":
+		if d.tokens[i].content == "" {
+			return 1, nil // Skip blank lines
+		}
 		consumed, node = d.parseParagraph(i, stop)
 	case "example":
 		consumed, node = d.parseExample(i, stop)
