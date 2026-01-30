@@ -25,10 +25,10 @@ import (
 
 // Position represents the location of a node in the source text.
 type Position struct {
-	StartLine   int // 1-based line number where the node starts
-	StartColumn int // 1-based column number where the node starts
-	EndLine     int // 1-based line number where the node ends
-	EndColumn   int // 1-based column number where the node ends
+	StartLine   int
+	StartColumn int
+	EndLine     int
+	EndColumn   int
 }
 
 type Configuration struct {
