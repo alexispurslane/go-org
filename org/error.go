@@ -61,10 +61,6 @@ func (e *ParseError) Unwrap() error {
 
 // locationString formats the position information for display.
 func (e *ParseError) locationString() string {
-	if e.StartLine == 0 && e.EndLine == 0 {
-		return ""
-	}
-
 	var loc string
 	if e.File != "" {
 		loc = e.File + ":"

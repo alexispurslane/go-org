@@ -70,9 +70,9 @@ type token struct {
 	lvl      int
 	content  string
 	matches  []string
-	line     int // 1-based line number where this token starts
-	startCol int // 1-based column number where this token starts
-	endCol   int // 1-based column number where this token ends
+	line     int
+	startCol int
+	endCol   int
 }
 
 var lexFns = []lexFn{
@@ -185,13 +185,13 @@ func (d *Document) tokenize(input io.Reader) {
 			continue
 		}
 		tok.line = lineNum
-		tok.startCol = 1
-		tok.endCol = len(line) + 1
+		tok.startCol = 0
+		tok.endCol = len(line)
 		d.tokens = append(d.tokens, tok)
 		lineNum++
 	}
 	if err := scanner.Err(); err != nil {
-		d.AddError(ErrorTypeIO, "tokenization failed", Position{StartLine: lineNum, StartColumn: 1, EndLine: lineNum, EndColumn: 1}, token{line: lineNum}, err)
+		d.AddError(ErrorTypeIO, "tokenization failed", Position{StartLine: lineNum, StartColumn: 0, EndLine: lineNum, EndColumn: 0}, token{line: lineNum}, err)
 	}
 }
 
