@@ -137,7 +137,7 @@ var latexFragmentPairs = map[string]string{
 
 // parseInline parses inline content without position tracking (legacy)
 func (d *Document) parseInline(input string) (nodes []Node) {
-	return d.parseInlineWithPos(input, 1, 0)
+	return d.parseInlineWithPos(input, 0, 0)
 }
 
 // parseInlineWithPos parses inline content with position tracking

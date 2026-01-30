@@ -174,7 +174,7 @@ func (c *Configuration) Silent() *Configuration {
 func (d *Document) tokenize(input io.Reader) {
 	d.tokens = []token{}
 	scanner := bufio.NewScanner(input)
-	lineNum := 1
+	lineNum := 0
 	for scanner.Scan() {
 		line := scanner.Text()
 		tok, ok := tokenize(line)
