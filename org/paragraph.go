@@ -67,3 +67,16 @@ func (d *Document) parseHorizontalRule(i int, parentStop stopFn) (int, Node) {
 
 func (n Paragraph) String() string      { return String(n) }
 func (n HorizontalRule) String() string { return String(n) }
+
+func (n Paragraph) Copy() Node {
+	return Paragraph{
+		Children: copyNodes(n.Children),
+		Pos:      n.Pos,
+	}
+}
+
+func (n HorizontalRule) Copy() Node {
+	return HorizontalRule{
+		Pos: n.Pos,
+	}
+}

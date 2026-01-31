@@ -3,6 +3,7 @@ package org
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -120,10 +121,8 @@ func (h Headline) IsExcluded(d *Document) bool {
 		return true
 	}
 	for _, excludedTag := range strings.Fields(d.Get("EXCLUDE_TAGS")) {
-		for _, tag := range h.Tags {
-			if tag == excludedTag {
-				return true
-			}
+		if slices.Contains(h.Tags, excludedTag) {
+			return true
 		}
 	}
 	return false
@@ -139,3 +138,23 @@ func (parent *Section) add(current *Section) {
 }
 
 func (n Headline) String() string { return String(n) }
+
+func (n Headline) Copy() Node {
+	var properties *PropertyDrawer
+	if n.Properties != nil {
+		copied := n.Properties.Copy().(PropertyDrawer)
+		properties = &copied
+	}
+	return Headline{
+		Index:      n.Index,
+		Lvl:        n.Lvl,
+		Status:     n.Status,
+		IsComment:  n.IsComment,
+		Priority:   n.Priority,
+		Properties: properties,
+		Title:      copyNodes(n.Title),
+		Tags:       append([]string(nil), n.Tags...),
+		Children:   copyNodes(n.Children),
+		Pos:        n.Pos,
+	}
+}

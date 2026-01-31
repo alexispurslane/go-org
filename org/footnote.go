@@ -49,3 +49,12 @@ func (d *Document) parseFootnoteDefinition(i int, parentStop stopFn) (int, Node)
 }
 
 func (n FootnoteDefinition) String() string { return String(n) }
+
+func (n FootnoteDefinition) Copy() Node {
+	return FootnoteDefinition{
+		Name:     n.Name,
+		Children: copyNodes(n.Children),
+		Inline:   n.Inline,
+		Pos:      n.Pos,
+	}
+}

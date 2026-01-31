@@ -593,3 +593,93 @@ func (n FootnoteLink) String() string      { return String(n) }
 func (n RegularLink) String() string       { return String(n) }
 func (n Macro) String() string             { return String(n) }
 func (n Timestamp) String() string         { return String(n) }
+
+func (n Text) Copy() Node {
+	return Text{
+		Content: n.Content,
+		IsRaw:   n.IsRaw,
+		Pos:     n.Pos,
+	}
+}
+
+func (n LineBreak) Copy() Node {
+	return LineBreak{
+		Count:                      n.Count,
+		BetweenMultibyteCharacters: n.BetweenMultibyteCharacters,
+		Pos:                        n.Pos,
+	}
+}
+
+func (n ExplicitLineBreak) Copy() Node {
+	return ExplicitLineBreak{
+		Pos: n.Pos,
+	}
+}
+
+func (n StatisticToken) Copy() Node {
+	return StatisticToken{
+		Content: n.Content,
+		Pos:     n.Pos,
+	}
+}
+
+func (n Emphasis) Copy() Node {
+	return Emphasis{
+		Kind:    n.Kind,
+		Content: copyNodes(n.Content),
+		Pos:     n.Pos,
+	}
+}
+
+func (n InlineBlock) Copy() Node {
+	return InlineBlock{
+		Name:       n.Name,
+		Parameters: append([]string(nil), n.Parameters...),
+		Children:   copyNodes(n.Children),
+		Pos:        n.Pos,
+	}
+}
+
+func (n LatexFragment) Copy() Node {
+	return LatexFragment{
+		OpeningPair: n.OpeningPair,
+		ClosingPair: n.ClosingPair,
+		Content:     n.Content,
+		Pos:         n.Pos,
+	}
+}
+
+func (n FootnoteLink) Copy() Node {
+	return FootnoteLink{
+		Name:       n.Name,
+		Definition: n.Definition,
+		Pos:        n.Pos,
+	}
+}
+
+func (n RegularLink) Copy() Node {
+	return RegularLink{
+		Protocol:    n.Protocol,
+		Description: copyNodes(n.Description),
+		URL:         n.URL,
+		AutoLink:    n.AutoLink,
+		Pos:         n.Pos,
+	}
+}
+
+func (n Macro) Copy() Node {
+	return Macro{
+		Name:       n.Name,
+		Parameters: append([]string(nil), n.Parameters...),
+		Pos:        n.Pos,
+	}
+}
+
+func (n Timestamp) Copy() Node {
+	return Timestamp{
+		Time:     n.Time,
+		IsDate:   n.IsDate,
+		Interval: n.Interval,
+		Pos:      n.Pos,
+	}
+}

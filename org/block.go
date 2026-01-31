@@ -235,3 +235,42 @@ func (n Example) String() string    { return String(n) }
 func (n Block) String() string      { return String(n) }
 func (n LatexBlock) String() string { return String(n) }
 func (n Result) String() string     { return String(n) }
+
+func (n Example) Copy() Node {
+	return Example{
+		Children: CopyNodes(n.Children),
+		Pos:      n.Pos,
+	}
+}
+
+func (n Block) Copy() Node {
+	var result Node
+	if n.Result != nil {
+		result = n.Result.Copy()
+	}
+	return Block{
+		Name:       n.Name,
+		Parameters: append([]string(nil), n.Parameters...),
+		Children:   CopyNodes(n.Children),
+		Result:     result,
+		Pos:        n.Pos,
+	}
+}
+
+func (n LatexBlock) Copy() Node {
+	return LatexBlock{
+		Content: CopyNodes(n.Content),
+		Pos:     n.Pos,
+	}
+}
+
+func (n Result) Copy() Node {
+	var node Node
+	if n.Node != nil {
+		node = n.Node.Copy()
+	}
+	return Result{
+		Node: node,
+		Pos:  n.Pos,
+	}
+}

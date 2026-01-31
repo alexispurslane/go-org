@@ -149,3 +149,31 @@ func (d *Document) parseListItem(l List, i int, parentStop stopFn) (int, Node) {
 func (n List) String() string                { return String(n) }
 func (n ListItem) String() string            { return String(n) }
 func (n DescriptiveListItem) String() string { return String(n) }
+
+func (n List) Copy() Node {
+	return List{
+		Kind:  n.Kind,
+		Items: copyNodes(n.Items),
+		Pos:   n.Pos,
+	}
+}
+
+func (n ListItem) Copy() Node {
+	return ListItem{
+		Bullet:   n.Bullet,
+		Status:   n.Status,
+		Value:    n.Value,
+		Children: copyNodes(n.Children),
+		Pos:      n.Pos,
+	}
+}
+
+func (n DescriptiveListItem) Copy() Node {
+	return DescriptiveListItem{
+		Bullet:  n.Bullet,
+		Status:  n.Status,
+		Term:    copyNodes(n.Term),
+		Details: copyNodes(n.Details),
+		Pos:     n.Pos,
+	}
+}

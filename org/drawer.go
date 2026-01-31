@@ -109,3 +109,22 @@ func (d *PropertyDrawer) Get(key string) (string, bool) {
 
 func (n Drawer) String() string         { return String(n) }
 func (n PropertyDrawer) String() string { return String(n) }
+
+func (n Drawer) Copy() Node {
+	return Drawer{
+		Name:     n.Name,
+		Children: CopyNodes(n.Children),
+		Pos:      n.Pos,
+	}
+}
+
+func (n PropertyDrawer) Copy() Node {
+	properties := make([][]string, len(n.Properties))
+	for i, p := range n.Properties {
+		properties[i] = append([]string(nil), p...)
+	}
+	return PropertyDrawer{
+		Properties: properties,
+		Pos:        n.Pos,
+	}
+}

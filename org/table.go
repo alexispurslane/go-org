@@ -151,3 +151,36 @@ func isSpecialRow(rawColumns []string) bool {
 }
 
 func (n Table) String() string { return String(n) }
+
+func (n Table) Copy() Node {
+	// Helper to copy a Row (Row doesn't implement Node)
+	copyRow := func(r Row) Row {
+		columns := make([]Column, len(r.Columns))
+		for i, c := range r.Columns {
+			// Helper to copy a Column (Column doesn't implement Node)
+			columns[i] = Column{
+				Children:   copyNodes(c.Children),
+				ColumnInfo: c.ColumnInfo,
+				Pos:        c.Pos,
+			}
+		}
+		return Row{
+			Columns:   columns,
+			IsSpecial: r.IsSpecial,
+			Pos:       r.Pos,
+		}
+	}
+
+	rows := make([]Row, len(n.Rows))
+	for i, r := range n.Rows {
+		rows[i] = copyRow(r)
+	}
+	columnInfos := make([]ColumnInfo, len(n.ColumnInfos))
+	copy(columnInfos, n.ColumnInfos)
+	return Table{
+		Rows:             rows,
+		ColumnInfos:      columnInfos,
+		SeparatorIndices: append([]int(nil), n.SeparatorIndices...),
+		Pos:              n.Pos,
+	}
+}

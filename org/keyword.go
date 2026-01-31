@@ -250,3 +250,61 @@ func (n Keyword) String() string      { return String(n) }
 func (n NodeWithMeta) String() string { return String(n) }
 func (n NodeWithName) String() string { return String(n) }
 func (n Include) String() string      { return String(n) }
+
+func (n Comment) Copy() Node {
+	return Comment{
+		Content: n.Content,
+		Pos:     n.Pos,
+	}
+}
+
+func (n Keyword) Copy() Node {
+	return Keyword{
+		Key:   n.Key,
+		Value: n.Value,
+		Pos:   n.Pos,
+	}
+}
+
+func (n NodeWithMeta) Copy() Node {
+	var caption [][]Node
+	if n.Meta.Caption != nil {
+		caption = make([][]Node, len(n.Meta.Caption))
+		for i, c := range n.Meta.Caption {
+			caption[i] = copyNodes(c)
+		}
+	}
+	htmlAttrs := make([][]string, len(n.Meta.HTMLAttributes))
+	for i, attr := range n.Meta.HTMLAttributes {
+		htmlAttrs[i] = append([]string(nil), attr...)
+	}
+	return NodeWithMeta{
+		Node: n.Node.Copy(),
+		Meta: Metadata{
+			Caption:        caption,
+			HTMLAttributes: htmlAttrs,
+			Pos:            n.Meta.Pos,
+		},
+		Pos: n.Pos,
+	}
+}
+
+func (n NodeWithName) Copy() Node {
+	return NodeWithName{
+		Name: n.Name,
+		Node: n.Node.Copy(),
+		Pos:  n.Pos,
+	}
+}
+
+func (n Include) Copy() Node {
+	return Include{
+		Keyword: Keyword{
+			Key:   n.Keyword.Key,
+			Value: n.Keyword.Value,
+			Pos:   n.Keyword.Pos,
+		},
+		Resolve: n.Resolve,
+		Pos:     n.Pos,
+	}
+}

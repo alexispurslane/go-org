@@ -59,6 +59,7 @@ type Document struct {
 // Node represents a parsed node of the document.
 type Node interface {
 	String() string // String returns the pretty printed Org mode string for the node (see OrgWriter).
+	Copy() Node     // Copy returns a deep copy of the node.
 }
 
 type lexFn = func(line string) (t token, ok bool)
@@ -117,6 +118,18 @@ func String(nodes ...Node) string {
 	orgWriterMutex.Lock()
 	defer orgWriterMutex.Unlock()
 	return orgWriter.WriteNodesAsString(nodes...)
+}
+
+// CopyNodes returns a deep copy of a slice of nodes.
+func CopyNodes(nodes []Node) []Node {
+	if nodes == nil {
+		return nil
+	}
+	copied := make([]Node, len(nodes))
+	for i, n := range nodes {
+		copied[i] = n.Copy()
+	}
+	return copied
 }
 
 // Write is called after with an instance of the Writer interface to export a parsed Document into another format.
@@ -285,7 +298,9 @@ func (d *Document) parseMany(i int, stop stopFn) (int, []Node) {
 	for i < len(d.tokens) && !stop(d, i) {
 		consumed, node := d.parseOne(i, stop)
 		i += consumed
-		nodes = append(nodes, node)
+		if node != nil {
+			nodes = append(nodes, node)
+		}
 	}
 	return i - start, nodes
 }
