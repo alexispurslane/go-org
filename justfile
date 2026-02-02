@@ -1,3 +1,6 @@
+build:
+    go build ./...
+
 # Default target
 default:
     @just test
