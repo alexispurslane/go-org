@@ -626,7 +626,7 @@ func (n StatisticToken) Copy() Node {
 func (n Emphasis) Copy() Node {
 	return Emphasis{
 		Kind:    n.Kind,
-		Content: copyNodes(n.Content),
+		Content: CopyNodes(n.Content),
 		Pos:     n.Pos,
 	}
 }
@@ -635,7 +635,7 @@ func (n InlineBlock) Copy() Node {
 	return InlineBlock{
 		Name:       n.Name,
 		Parameters: append([]string(nil), n.Parameters...),
-		Children:   copyNodes(n.Children),
+		Children:   CopyNodes(n.Children),
 		Pos:        n.Pos,
 	}
 }
@@ -660,7 +660,7 @@ func (n FootnoteLink) Copy() Node {
 func (n RegularLink) Copy() Node {
 	return RegularLink{
 		Protocol:    n.Protocol,
-		Description: copyNodes(n.Description),
+		Description: CopyNodes(n.Description),
 		URL:         n.URL,
 		AutoLink:    n.AutoLink,
 		Pos:         n.Pos,
@@ -683,3 +683,65 @@ func (n Timestamp) Copy() Node {
 		Pos:      n.Pos,
 	}
 }
+
+func (n Text) Range(f func(Node) bool) {}
+
+func (n Text) Position() Position { return n.Pos }
+
+func (n LineBreak) Range(f func(Node) bool) {}
+
+func (n LineBreak) Position() Position { return n.Pos }
+
+func (n ExplicitLineBreak) Range(f func(Node) bool) {}
+
+func (n ExplicitLineBreak) Position() Position { return n.Pos }
+
+func (n StatisticToken) Range(f func(Node) bool) {}
+
+func (n StatisticToken) Position() Position { return n.Pos }
+
+func (n Timestamp) Range(f func(Node) bool) {}
+
+func (n Timestamp) Position() Position { return n.Pos }
+
+func (n Emphasis) Range(f func(Node) bool) {
+	for _, child := range n.Content {
+		if !f(child) {
+			return
+		}
+	}
+}
+
+func (n Emphasis) Position() Position { return n.Pos }
+
+func (n InlineBlock) Range(f func(Node) bool) {
+	for _, child := range n.Children {
+		if !f(child) {
+			return
+		}
+	}
+}
+
+func (n InlineBlock) Position() Position { return n.Pos }
+
+func (n LatexFragment) Range(f func(Node) bool) {}
+
+func (n LatexFragment) Position() Position { return n.Pos }
+
+func (n FootnoteLink) Range(f func(Node) bool) {}
+
+func (n FootnoteLink) Position() Position { return n.Pos }
+
+func (n RegularLink) Range(f func(Node) bool) {
+	for _, child := range n.Description {
+		if !f(child) {
+			return
+		}
+	}
+}
+
+func (n RegularLink) Position() Position { return n.Pos }
+
+func (n Macro) Range(f func(Node) bool) {}
+
+func (n Macro) Position() Position { return n.Pos }

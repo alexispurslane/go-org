@@ -58,9 +58,20 @@ type Document struct {
 
 // Node represents a parsed node of the document.
 type Node interface {
-	String() string // String returns the pretty printed Org mode string for the node (see OrgWriter).
-	Copy() Node     // Copy returns a deep copy of the node.
+	String() string        // String returns the pretty printed Org mode string for the node (see OrgWriter).
+	Copy() Node            // Copy returns a deep copy of the node.
+	Range(func(Node) bool) // Range iterates over all children of the node. Stops if the function returns false.
+	Position() Position    // Position returns the position of the node in the source text.
 }
+
+// NOTE: the reason I decided to do a Range method instead of a Children getter
+// is that a node may have different properties on it that function as a
+// children property, so if we do a Children getter do we either have it *only
+// return the literal Children property if present*, or do we have it
+// *transparently append all the properties that have children*? At least with
+// Range, the interface isn't lying, and it's clear that it might be going over
+// multiple things, when you have to append all its results together to get a
+// full children list. Idk.
 
 type lexFn = func(line string) (t token, ok bool)
 type parseFn = func(*Document, int, stopFn) (int, Node)

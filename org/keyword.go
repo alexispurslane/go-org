@@ -271,7 +271,7 @@ func (n NodeWithMeta) Copy() Node {
 	if n.Meta.Caption != nil {
 		caption = make([][]Node, len(n.Meta.Caption))
 		for i, c := range n.Meta.Caption {
-			caption[i] = copyNodes(c)
+			caption[i] = CopyNodes(c)
 		}
 	}
 	htmlAttrs := make([][]string, len(n.Meta.HTMLAttributes))
@@ -308,3 +308,38 @@ func (n Include) Copy() Node {
 		Pos:     n.Pos,
 	}
 }
+
+func (n Comment) Range(f func(Node) bool) {}
+
+func (n Comment) Position() Position { return n.Pos }
+
+func (n Keyword) Range(f func(Node) bool) {}
+
+func (n Keyword) Position() Position { return n.Pos }
+
+func (n NodeWithMeta) Range(f func(Node) bool) {
+	if !f(n.Node) {
+		return
+	}
+	for _, captionGroup := range n.Meta.Caption {
+		for _, child := range captionGroup {
+			if !f(child) {
+				return
+			}
+		}
+	}
+}
+
+func (n NodeWithMeta) Position() Position { return n.Pos }
+
+func (n NodeWithName) Range(f func(Node) bool) {
+	if n.Node != nil {
+		f(n.Node)
+	}
+}
+
+func (n NodeWithName) Position() Position { return n.Pos }
+
+func (n Include) Range(f func(Node) bool) {}
+
+func (n Include) Position() Position { return n.Pos }

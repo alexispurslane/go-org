@@ -128,3 +128,19 @@ func (n PropertyDrawer) Copy() Node {
 		Pos:        n.Pos,
 	}
 }
+
+func (n Drawer) Range(f func(Node) bool) {
+	for _, child := range n.Children {
+		if !f(child) {
+			return
+		}
+	}
+}
+
+func (n Drawer) Position() Position { return n.Pos }
+
+func (n PropertyDrawer) Range(f func(Node) bool) {
+	// PropertyDrawer has no child nodes, only string properties
+}
+
+func (n PropertyDrawer) Position() Position { return n.Pos }

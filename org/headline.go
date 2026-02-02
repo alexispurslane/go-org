@@ -152,9 +152,24 @@ func (n Headline) Copy() Node {
 		IsComment:  n.IsComment,
 		Priority:   n.Priority,
 		Properties: properties,
-		Title:      copyNodes(n.Title),
+		Title:      CopyNodes(n.Title),
 		Tags:       append([]string(nil), n.Tags...),
-		Children:   copyNodes(n.Children),
+		Children:   CopyNodes(n.Children),
 		Pos:        n.Pos,
 	}
 }
+
+func (n Headline) Range(f func(Node) bool) {
+	for _, child := range n.Title {
+		if !f(child) {
+			return
+		}
+	}
+	for _, child := range n.Children {
+		if !f(child) {
+			return
+		}
+	}
+}
+
+func (n Headline) Position() Position { return n.Pos }

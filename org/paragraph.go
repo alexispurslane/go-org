@@ -70,7 +70,7 @@ func (n HorizontalRule) String() string { return String(n) }
 
 func (n Paragraph) Copy() Node {
 	return Paragraph{
-		Children: copyNodes(n.Children),
+		Children: CopyNodes(n.Children),
 		Pos:      n.Pos,
 	}
 }
@@ -80,3 +80,17 @@ func (n HorizontalRule) Copy() Node {
 		Pos: n.Pos,
 	}
 }
+
+func (n Paragraph) Range(f func(Node) bool) {
+	for _, child := range n.Children {
+		if !f(child) {
+			return
+		}
+	}
+}
+
+func (n Paragraph) Position() Position { return n.Pos }
+
+func (n HorizontalRule) Range(f func(Node) bool) {}
+
+func (n HorizontalRule) Position() Position { return n.Pos }

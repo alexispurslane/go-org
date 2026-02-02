@@ -274,3 +274,44 @@ func (n Result) Copy() Node {
 		Pos:  n.Pos,
 	}
 }
+
+func (n Example) Range(f func(Node) bool) {
+	for _, child := range n.Children {
+		if !f(child) {
+			return
+		}
+	}
+}
+
+func (n Example) Position() Position { return n.Pos }
+
+func (n Block) Range(f func(Node) bool) {
+	for _, child := range n.Children {
+		if !f(child) {
+			return
+		}
+	}
+	if n.Result != nil {
+		f(n.Result)
+	}
+}
+
+func (n Block) Position() Position { return n.Pos }
+
+func (n LatexBlock) Range(f func(Node) bool) {
+	for _, child := range n.Content {
+		if !f(child) {
+			return
+		}
+	}
+}
+
+func (n LatexBlock) Position() Position { return n.Pos }
+
+func (n Result) Range(f func(Node) bool) {
+	if n.Node != nil {
+		f(n.Node)
+	}
+}
+
+func (n Result) Position() Position { return n.Pos }

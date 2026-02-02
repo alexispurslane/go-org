@@ -7,8 +7,29 @@ import (
 	"unicode"
 )
 
+type ListKind int
+
+const (
+	UnorderedList ListKind = iota
+	OrderedList
+	DescriptiveList
+)
+
+func (k ListKind) String() string {
+	switch k {
+	case UnorderedList:
+		return "unordered"
+	case OrderedList:
+		return "ordered"
+	case DescriptiveList:
+		return "descriptive"
+	default:
+		return "unknown"
+	}
+}
+
 type List struct {
-	Kind  string
+	Kind  ListKind
 	Items []Node
 	Pos   Position
 }
@@ -48,20 +69,20 @@ func isListToken(t token) bool {
 	return t.kind == "unorderedList" || t.kind == "orderedList"
 }
 
-func listKind(t token) (string, string) {
-	kind := ""
+func listKind(t token) (ListKind, ListKind) {
+	mainKind := UnorderedList
 	switch bullet := t.matches[2]; {
 	case bullet == "*" || bullet == "+" || bullet == "-":
-		kind = "unordered"
+		mainKind = UnorderedList
 	case unicode.IsLetter(rune(bullet[0])), unicode.IsDigit(rune(bullet[0])):
-		kind = "ordered"
+		mainKind = OrderedList
 	default:
 		panic(fmt.Sprintf("bad list bullet '%s': %#v", bullet, t))
 	}
 	if descriptiveListItemRegexp.MatchString(t.content) {
-		return kind, "descriptive"
+		return mainKind, DescriptiveList
 	}
-	return kind, kind
+	return mainKind, mainKind
 }
 
 func (d *Document) parseList(i int, parentStop stopFn) (int, Node) {
@@ -94,13 +115,13 @@ func (d *Document) parseListItem(l List, i int, parentStop stopFn) (int, Node) {
 	minIndent, dterm, content, status, value := d.tokens[i].lvl+len(bullet), "", d.tokens[i].content, "", ""
 	originalBaseLvl := d.baseLvl
 	d.baseLvl = minIndent + 1
-	if m := listItemValueRegexp.FindStringSubmatch(content); m != nil && l.Kind == "ordered" {
+	if m := listItemValueRegexp.FindStringSubmatch(content); m != nil && l.Kind == OrderedList {
 		value, content = m[1], content[len("[@] ")+len(m[1]):]
 	}
 	if m := listItemStatusRegexp.FindStringSubmatch(content); m != nil {
 		status, content = m[1], content[len("[ ] "):]
 	}
-	if l.Kind == "descriptive" {
+	if l.Kind == DescriptiveList {
 		if m := descriptiveListItemRegexp.FindStringIndex(content); m != nil {
 			dterm, content = content[:m[0]], content[m[1]:]
 			d.baseLvl = strings.Index(d.tokens[i].matches[0], " ::") + 4
@@ -126,7 +147,7 @@ func (d *Document) parseListItem(l List, i int, parentStop stopFn) (int, Node) {
 		nodes = append(nodes, node)
 	}
 	d.baseLvl = originalBaseLvl
-	if l.Kind == "descriptive" {
+	if l.Kind == DescriptiveList {
 		item := DescriptiveListItem{Bullet: bullet, Status: status, Term: d.parseInline(dterm), Details: nodes}
 		item.Pos = Position{
 			StartLine:   d.tokens[start].line,
@@ -153,7 +174,7 @@ func (n DescriptiveListItem) String() string { return String(n) }
 func (n List) Copy() Node {
 	return List{
 		Kind:  n.Kind,
-		Items: copyNodes(n.Items),
+		Items: CopyNodes(n.Items),
 		Pos:   n.Pos,
 	}
 }
@@ -163,7 +184,7 @@ func (n ListItem) Copy() Node {
 		Bullet:   n.Bullet,
 		Status:   n.Status,
 		Value:    n.Value,
-		Children: copyNodes(n.Children),
+		Children: CopyNodes(n.Children),
 		Pos:      n.Pos,
 	}
 }
@@ -172,8 +193,43 @@ func (n DescriptiveListItem) Copy() Node {
 	return DescriptiveListItem{
 		Bullet:  n.Bullet,
 		Status:  n.Status,
-		Term:    copyNodes(n.Term),
-		Details: copyNodes(n.Details),
+		Term:    CopyNodes(n.Term),
+		Details: CopyNodes(n.Details),
 		Pos:     n.Pos,
 	}
 }
+
+func (n List) Range(f func(Node) bool) {
+	for _, child := range n.Items {
+		if !f(child) {
+			return
+		}
+	}
+}
+
+func (n List) Position() Position { return n.Pos }
+
+func (n ListItem) Range(f func(Node) bool) {
+	for _, child := range n.Children {
+		if !f(child) {
+			return
+		}
+	}
+}
+
+func (n ListItem) Position() Position { return n.Pos }
+
+func (n DescriptiveListItem) Range(f func(Node) bool) {
+	for _, child := range n.Term {
+		if !f(child) {
+			return
+		}
+	}
+	for _, child := range n.Details {
+		if !f(child) {
+			return
+		}
+	}
+}
+
+func (n DescriptiveListItem) Position() Position { return n.Pos }

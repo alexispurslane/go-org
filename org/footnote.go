@@ -53,8 +53,18 @@ func (n FootnoteDefinition) String() string { return String(n) }
 func (n FootnoteDefinition) Copy() Node {
 	return FootnoteDefinition{
 		Name:     n.Name,
-		Children: copyNodes(n.Children),
+		Children: CopyNodes(n.Children),
 		Inline:   n.Inline,
 		Pos:      n.Pos,
 	}
 }
+
+func (n FootnoteDefinition) Range(f func(Node) bool) {
+	for _, child := range n.Children {
+		if !f(child) {
+			return
+		}
+	}
+}
+
+func (n FootnoteDefinition) Position() Position { return n.Pos }

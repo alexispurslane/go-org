@@ -60,10 +60,10 @@ var emphasisTags = map[string][]string{
 	"^{}": {"<sup>", "</sup>"},
 }
 
-var listTags = map[string][]string{
-	"unordered":   {"<ul>", "</ul>"},
-	"ordered":     {"<ol>", "</ol>"},
-	"descriptive": {"<dl>", "</dl>"},
+var listTags = map[ListKind][]string{
+	UnorderedList:   {"<ul>", "</ul>"},
+	OrderedList:     {"<ol>", "</ol>"},
+	DescriptiveList: {"<dl>", "</dl>"},
 }
 
 var listItemStatuses = map[string]string{

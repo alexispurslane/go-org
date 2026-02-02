@@ -159,7 +159,7 @@ func (n Table) Copy() Node {
 		for i, c := range r.Columns {
 			// Helper to copy a Column (Column doesn't implement Node)
 			columns[i] = Column{
-				Children:   copyNodes(c.Children),
+				Children:   CopyNodes(c.Children),
 				ColumnInfo: c.ColumnInfo,
 				Pos:        c.Pos,
 			}
@@ -184,3 +184,17 @@ func (n Table) Copy() Node {
 		Pos:              n.Pos,
 	}
 }
+
+func (n Table) Range(f func(Node) bool) {
+	for _, row := range n.Rows {
+		for _, col := range row.Columns {
+			for _, child := range col.Children {
+				if !f(child) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func (n Table) Position() Position { return n.Pos }
