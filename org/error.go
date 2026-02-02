@@ -120,6 +120,23 @@ func (d *Document) HasErrors() bool {
 	return len(d.Errors) > 0
 }
 
+// HasFatalError returns true if the document has a fatal error that prevented successful parsing.
+func (d *Document) HasFatalError() bool {
+	return d.FatalError != nil
+}
+
+// AddFatalError sets a fatal error that prevents successful parsing.
+// This is used for unrecoverable errors where the parser cannot continue.
+func (d *Document) AddFatalError(typ ErrorType, message string, pos Position, tok token, cause error) {
+	err := NewParseError(typ, message, d.Path, pos, tok, cause)
+	d.FatalError = err
+	// Also add to Errors slice for completeness
+	if d.Errors == nil {
+		d.Errors = make([]*ParseError, 0)
+	}
+	d.Errors = append(d.Errors, err)
+}
+
 // WriteErrors writes all document errors to the provided writer, one per line.
 func (d *Document) WriteErrors(w io.Writer) error {
 	for _, err := range d.Errors {

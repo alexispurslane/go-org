@@ -53,6 +53,7 @@ type Document struct {
 	Outline        Outline           // Outline is a Table Of Contents for the document and contains all sections (headline + content).
 	BufferSettings map[string]string // Settings contains all settings that were parsed from keywords.
 	Errors         []*ParseError     // Structured parsing errors with position information
+	FatalError     *ParseError       // Fatal error that prevented successful parsing
 	Pos            Position          // Position tracks the location of this document in the source
 }
 
@@ -150,8 +151,8 @@ func (d *Document) Write(w Writer) (out string, err error) {
 			err = fmt.Errorf("could not write output: %s", recovered)
 		}
 	}()
-	if d.HasErrors() {
-		return "", d.Errors[0]
+	if d.HasFatalError() {
+		return "", d.FatalError
 	} else if d.Nodes == nil {
 		return "", fmt.Errorf("could not write output: parse was not called")
 	}
@@ -176,11 +177,11 @@ func (c *Configuration) Parse(input io.Reader, path string) (d *Document) {
 	}
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			d.AddError(ErrorTypeInvalidStructure, "parse panic", d.Pos, token{}, fmt.Errorf("recovered from panic: %v", recovered))
+			d.AddFatalError(ErrorTypeInvalidStructure, "parse panic", d.Pos, token{}, fmt.Errorf("recovered from panic: %v", recovered))
 		}
 	}()
 	if d.tokens != nil {
-		d.AddError(ErrorTypeValidation, "parse called multiple times", d.Pos, token{}, nil)
+		d.AddFatalError(ErrorTypeValidation, "parse called multiple times", d.Pos, token{}, nil)
 		return nil
 	}
 	d.tokenize(input)
@@ -215,7 +216,7 @@ func (d *Document) tokenize(input io.Reader) {
 		lineNum++
 	}
 	if err := scanner.Err(); err != nil {
-		d.AddError(ErrorTypeIO, "tokenization failed", Position{StartLine: lineNum, StartColumn: 0, EndLine: lineNum, EndColumn: 0}, token{line: lineNum}, err)
+		d.AddFatalError(ErrorTypeIO, "tokenization failed", Position{StartLine: lineNum, StartColumn: 0, EndLine: lineNum, EndColumn: 0}, token{line: lineNum}, err)
 	}
 }
 
@@ -277,9 +278,6 @@ func (d *Document) parseOne(i int, stop stopFn) (consumed int, node Node) {
 	case "beginDrawer":
 		consumed, node = d.parseDrawer(i, stop)
 	case "text":
-		if d.tokens[i].content == "" {
-			return 1, nil // Skip blank lines
-		}
 		consumed, node = d.parseParagraph(i, stop)
 	case "example":
 		consumed, node = d.parseExample(i, stop)

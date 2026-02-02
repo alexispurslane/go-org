@@ -127,7 +127,9 @@ func (d *Document) parseLatexBlock(i int, parentStop stopFn) (int, Node) {
 	for ; !stop(d, i); i++ {
 		rawText += trim(d.tokens[i].matches[0]) + "\n"
 	}
+
 	if i < len(d.tokens) && d.tokens[i].kind == "endLatexBlock" && d.tokens[i].content == name {
+		rawText += trim(d.tokens[i].matches[0])
 		i++
 	} else {
 		d.AddError(ErrorTypeInvalidStructure, "unterminated latex block", getPositionFromToken(t), t, nil)
