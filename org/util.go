@@ -1,6 +1,8 @@
 package org
 
 import (
+	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -36,8 +38,8 @@ func ParseRanges(s string) [][2]int {
 	if s == "" {
 		return ranges
 	}
-	fields := strings.Split(s, " ")
-	for _, field := range fields {
+	fields := strings.SplitSeq(s, " ")
+	for field := range fields {
 		field = strings.TrimSpace(field)
 		if field == "" {
 			continue
@@ -71,4 +73,45 @@ func ParseRanges(s string) [][2]int {
 
 func IsNewLineChar(r rune) bool {
 	return r == '\n' || r == '\r'
+}
+
+// PrintNodeTree returns a string representation of an org.Node hierarchy as a tree showing types, positions, and string representations.
+func PrintNodeTree(nodes []Node, indent string) string {
+	var builder strings.Builder
+	for _, node := range nodes {
+		if node == nil {
+			fmt.Fprintf(&builder, "%s<nil>\n", indent)
+			continue
+		}
+
+		// Get type information via reflection
+		nodeType := reflect.TypeOf(node)
+		if nodeType.Kind() == reflect.Pointer {
+			nodeType = nodeType.Elem()
+		}
+
+		// Get position
+		pos := node.Position()
+		posStr := fmt.Sprintf("%d:%d-%d:%d", pos.StartLine, pos.StartColumn, pos.EndLine, pos.EndColumn)
+
+		// Get string representation
+		nodeStr := String(node)
+		// Truncate if too long
+		if len(nodeStr) > 100 {
+			nodeStr = nodeStr[:97] + "..."
+		}
+		// Escape newlines and tabs for cleaner display
+		nodeStr = strings.ReplaceAll(nodeStr, "\n", `\n`)
+		nodeStr = strings.ReplaceAll(nodeStr, "\t", `\t`)
+
+		// Print current node
+		fmt.Fprintf(&builder, "%s%s [%s] %q\n", indent, nodeType.Name(), posStr, nodeStr)
+
+		// Recursively print children
+		node.Range(func(child Node) bool {
+			builder.WriteString(PrintNodeTree([]Node{child}, indent+"  "))
+			return true
+		})
+	}
+	return builder.String()
 }

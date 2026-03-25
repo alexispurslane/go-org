@@ -160,11 +160,6 @@ func (n Headline) Copy() Node {
 }
 
 func (n Headline) Range(f func(Node) bool) {
-	for _, child := range n.Title {
-		if !f(child) {
-			return
-		}
-	}
 	for _, child := range n.Children {
 		if !f(child) {
 			return

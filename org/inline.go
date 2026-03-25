@@ -732,13 +732,7 @@ func (n FootnoteLink) Range(f func(Node) bool) {}
 
 func (n FootnoteLink) Position() Position { return n.Pos }
 
-func (n RegularLink) Range(f func(Node) bool) {
-	for _, child := range n.Description {
-		if !f(child) {
-			return
-		}
-	}
-}
+func (n RegularLink) Range(f func(Node) bool) {}
 
 func (n RegularLink) Position() Position { return n.Pos }
 

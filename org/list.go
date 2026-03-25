@@ -28,18 +28,35 @@ func (k ListKind) String() string {
 	}
 }
 
+// List represents a collection of ListItem or DescriptiveListItem nodes,
+// forming an ordered, unordered, or descriptive list in an org-mode document.
 type List struct {
-	Kind  ListKind
+	// Kind indicates the type of list (unordered, ordered, or descriptive)
+	Kind ListKind
+	// Items contains the individual list items that belong to this list
 	Items []Node
-	Pos   Position
+	// Pos tracks the source document position where this list begins
+	Pos Position
 }
 
+// ListItem represents a single list item within an ordered or unordered list.
+// It captures the bullet marker, optional status checkbox, value override, and child content.
 type ListItem struct {
-	Bullet   string
-	Status   string
-	Value    string
+	// Bullet is the literal list marker character(s) from source:
+	//   "-" "*" "+" for unordered; "1.", "a)", "A)" for ordered
+	Bullet string
+	// Status is a single character indicating completion state:
+	//   " " (incomplete), "X" (done), or "-" (partial)
+	// Appears as "[ ]", "[X]", or "[-]" in source text
+	Status string
+	// Value is for ordered lists only: overrides automatic numbering with [@num]
+	// Allows explicit numbering like "[@5]" to force a specific number
+	Value string
+	// Children contains the actual content nodes after the marker/status/value prefixes
+	// Includes text, nested lists, code blocks, or other Org elements
 	Children []Node
-	Pos      Position
+	// Pos tracks the source document position where this list item begins
+	Pos Position
 }
 
 type DescriptiveListItem struct {
@@ -89,7 +106,7 @@ func (d *Document) parseList(i int, parentStop stopFn) (int, Node) {
 	start, lvl := i, d.tokens[i].lvl
 	listMainKind, kind := listKind(d.tokens[i])
 	list := List{Kind: kind}
-	stop := func(*Document, int) bool {
+	stop := func(d *Document, i int) bool {
 		if parentStop(d, i) || d.tokens[i].lvl != lvl || !isListToken(d.tokens[i]) {
 			return true
 		}
@@ -101,11 +118,13 @@ func (d *Document) parseList(i int, parentStop stopFn) (int, Node) {
 		i += consumed
 		list.Items = append(list.Items, node)
 	}
-	list.Pos = Position{
-		StartLine:   d.tokens[start].line,
-		StartColumn: d.tokens[start].startCol,
-		EndLine:     d.tokens[i-1].line,
-		EndColumn:   d.tokens[i-1].endCol,
+	if i > start {
+		list.Pos = Position{
+			StartLine:   d.tokens[start].line,
+			StartColumn: d.tokens[start].startCol,
+			EndLine:     d.tokens[i-1].line,
+			EndColumn:   d.tokens[i-1].endCol,
+		}
 	}
 	return i - start, list
 }
@@ -129,11 +148,17 @@ func (d *Document) parseListItem(l List, i int, parentStop stopFn) (int, Node) {
 	}
 
 	var ok bool
+	originalLine := d.tokens[i].line
+	originalStartCol := d.tokens[i].startCol
+	originalEndCol := d.tokens[i].endCol
 	d.tokens[i], ok = tokenize(strings.Repeat(" ", minIndent) + content)
 	if !ok {
 		line := d.tokens[i].line
 		d.AddError(ErrorTypeTokenization, "could not lex line", getPositionFromToken(d.tokens[i]), d.tokens[i], fmt.Errorf("no lexer matched: %q", line))
 	}
+	d.tokens[i].line = originalLine
+	d.tokens[i].startCol = originalStartCol
+	d.tokens[i].endCol = originalEndCol
 	stop := func(d *Document, i int) bool {
 		if parentStop(d, i) {
 			return true
